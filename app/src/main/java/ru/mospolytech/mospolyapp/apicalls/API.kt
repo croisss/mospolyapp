@@ -12,6 +12,7 @@ import retrofit2.http.Query
 
 data class TokenResponse(
     val token: String,
+    val guid: String,
     val jwt: String,
     val jwt_refresh: String
 )

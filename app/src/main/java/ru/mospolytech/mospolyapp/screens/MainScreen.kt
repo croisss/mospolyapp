@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -352,6 +354,7 @@ fun MainScreen() {
                         }
                         composable(webTab.title) {
                             var showWebView by remember { mutableStateOf("") }
+                            var showContacts by remember { mutableStateOf("") }
                             Column(
                                 modifier = Modifier.padding(
                                     top = 16.dp,
@@ -380,8 +383,11 @@ fun MainScreen() {
                                                 title = "Настройки",
                                                 cardcolor = Color(121, 121, 121),
                                                 icon = Icons.Filled.Settings,
-                                                { })
-                                            Spacer(modifier = Modifier.size(100.dp))
+                                                ){ }
+                                            SectionCard(
+                                                title = "Справочник",
+                                                cardcolor = Color(95, 95, 95),
+                                                icon = Icons.Filled.Info,){ showContacts = "1" }
                                         }
                                         Spacer(modifier = Modifier.size(24.dp))
 
@@ -421,6 +427,9 @@ fun MainScreen() {
                             }
                             if (showWebView != "") {
                                 WebViewScreen(showWebView, onDismiss = { showWebView = "" })
+                            }
+                            if (showContacts != "") {
+                                ContactsScreen(onDismiss = { showContacts = "" })
                             }
                         }
                         composable(settingsTab.title) {
@@ -769,6 +778,159 @@ fun WebViewScreen(url: String, onDismiss: () -> Unit) {
             .fillMaxSize()
             .absoluteOffset()
         )
+    }
+}
+
+@Composable
+fun ContactsScreen(onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp, 16.dp, 16.dp, 0.dp)
+            .background(Color(0xFF3a3a3a))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            IconButton( // IconButton inherits from Button
+                onClick = { onDismiss() },
+                modifier = Modifier
+                    .size(30.dp) // Set desired size for the button
+
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Notifications button"
+                )
+            }
+            Spacer(modifier = Modifier.size(16.dp))
+            HeadingTextComponent("Справочник")
+        }
+        Spacer(modifier = Modifier.size(16.dp))
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .absoluteOffset(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            items(1) {
+                HeadingTextComponent("РЕКТОРАТ")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Миклушевский Владимир Владимирович", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Ректор", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "")
+                        Text(text = "А-203")
+                    }
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .weight(1f),
+                    thickness = 1.dp,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.size(10.dp))
+
+                HeadingTextComponent("АППАРАТ РЕКТОРА")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Шолохов Олег Викторович", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Руководитель аппарата ректора", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "1102")
+                        Text(text = "А-203")
+                    }
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Хамраева Жанори", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Помощник ректора по организационным вопросам", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "1101")
+                        Text(text = "А-203")
+                    }
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Бондаренко Дарья Владимировна", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Помощник ректора по документации", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "1202")
+                        Text(text = "А-203")
+                    }
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .weight(1f),
+                    thickness = 1.dp,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.size(10.dp))
+
+                HeadingTextComponent("ОТДЕЛ КОНТРОЛЯ ИСПОЛНЕНИЙ ПОРУЧЕНИЙ РЕКТОРА")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Царев Василий Иванович", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Помощник ректора", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween){
+                        Text(text = "1132")
+                        Text(text = "А-102")
+                    }
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Демин Тимофей Витальевич", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Документовед", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "1144")
+                        Text(text = "А-102")
+                    }
+                }
+                HorizontalDivider(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .weight(1f),
+                    thickness = 1.dp,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.size(10.dp))
+
+                HeadingTextComponent("ПЕРВЫЙ ПРОРЕКТОР")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    Text(text = "Абв Где Жзи", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                    Text(text = "Первый проректор", textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(text = "1234")
+                        Text(text = "Й-123")
+                    }
+                }
+            }
+        }
     }
 }
 
