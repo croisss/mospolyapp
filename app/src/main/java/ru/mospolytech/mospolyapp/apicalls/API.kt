@@ -65,6 +65,21 @@ data class UserData(
     val lastaccess: String
 )
 
+data class Contact(
+    val name: String,
+    val title: String,
+    val number: String,
+    val cabinet: String
+)
+data class ContactGroup(
+    val name: String,
+    val contacts: List<Contact>
+)
+data class BiggerContactGroup(
+    val name: String,
+    val contactgroups: List<ContactGroup>
+)
+
 
 data class Lesson(
     val name: String,
@@ -86,6 +101,29 @@ data class Schedule(
     val Friday: Day,
     val Saturday: Day
 )
+
+data class AcademicPerformance(
+    val academicPerformance: List<Bill>
+)
+data class Bill(
+    val id: String,
+    val bill_num: String,
+    val bill_type: String,
+    val doc_type: String,
+    val name: String,
+    val exam_date: String,
+    val exam_time: String,
+    val grade: String,
+    val ticket_num: String,
+    val teacher: String,
+    val course: String,
+    val exam_type: String,
+    val chair: String,
+    val year: String,
+    val semestr: String
+)
+
+
 interface MPUAPI {
     @FormUrlEncoded
     @POST("lk_api.php")
@@ -117,4 +155,11 @@ interface MPUAPI {
         @Query("getUser") getUser: Boolean,
         @Query("token") token: String?
     ): Call<User>
+
+    @GET("lk_api.php/")
+    fun getPerf(
+        @Query("getAcademicPerformance") getAcademicPerformance: Boolean,
+        @Query("semestr") semestr: String,
+        @Query("token") token: String
+    ): Call<AcademicPerformance>
 }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
@@ -41,13 +40,17 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -67,6 +70,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -74,6 +78,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +89,9 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -97,6 +105,7 @@ import ru.mospolytech.mospolyapp.TabBarItem
 import ru.mospolytech.mospolyapp.TextComponent
 import ru.mospolytech.mospolyapp.TokenManager
 import ru.mospolytech.mospolyapp.apicalls.Alert
+import ru.mospolytech.mospolyapp.apicalls.BiggerContactGroup
 import ru.mospolytech.mospolyapp.apicalls.Lesson
 import ru.mospolytech.mospolyapp.apicalls.MPUAPI
 import ru.mospolytech.mospolyapp.apicalls.Notification
@@ -107,6 +116,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.safety.Safelist
+import ru.mospolytech.mospolyapp.apicalls.AcademicPerformance
 
 
 val provider = GoogleFont.Provider(
@@ -123,6 +136,7 @@ lateinit var defaultSchedule: Schedule
 lateinit var defaultUser: User
 lateinit var defaultNotifications: List<Notification>
 lateinit var defaultAlerts: List<Alert>
+val defaultPerfs: MutableList<AcademicPerformance> = mutableListOf()
 
 @Composable
 fun LoadingInfo() {
@@ -130,6 +144,7 @@ fun LoadingInfo() {
     var dataLoaded2 by remember { mutableStateOf(false) }
     var dataLoaded3 by remember { mutableStateOf(false) }
     var dataLoaded4 by remember { mutableStateOf(false) }
+    var dataLoaded5 by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val retrofit = Retrofit.Builder()
             .baseUrl("https://e.mospolytech.ru/old/")
@@ -208,8 +223,42 @@ fun LoadingInfo() {
                 Log.e("API", "failure")
             }
         })
+
+        //on calling bills switched from async enqueue() to sync execute(), because
+        //incrementing semestr's is way simpler that way, and we are already in a coroutine
+        //different from the ui because of LaunchedEffect()
+        //EXECUTE() DOESNT WORK FOR SOME REASON, IMPLEMENT LATER
+        var semestr = 1
+        fun perfRequest(semestr: Int) {
+            val perfCall = mpuapi.getPerf(true, semestr.toString(), TokenManager.token)
+            perfCall.enqueue(object : Callback<AcademicPerformance> {
+                override fun onResponse(call: Call<AcademicPerformance>, response: Response<AcademicPerformance>) {
+                    if (response.isSuccessful) {
+                        val responseBody = response.body()
+                        if (responseBody != null && responseBody.academicPerformance.isNotEmpty()) {
+                            defaultPerfs.add(responseBody)
+                            Log.d("API", "perf added for number: $semestr")
+
+                            // Continue to the next number
+                            perfRequest(semestr + 1)
+                        } else {
+                            // Stop condition met: empty response
+                            Log.d("API", "Stopping, no data for number: $semestr")
+                            dataLoaded5 = true
+                        }
+                    } else {
+                        Log.e("API", "Response not successful: ${response.code()}")
+                    }
+                }
+
+                override fun onFailure(call: Call<AcademicPerformance>, t: Throwable) {
+                    Log.e("API", "failure")
+                }
+            })
+        }
+        perfRequest(semestr)
     }
-    if (dataLoaded1 && dataLoaded2 && dataLoaded3 && dataLoaded4) {
+    if (dataLoaded1 && dataLoaded2 && dataLoaded3 && dataLoaded4 && dataLoaded5) {
         MainScreen()
     } else {
         Surface(
@@ -355,6 +404,7 @@ fun MainScreen() {
                         composable(webTab.title) {
                             var showWebView by remember { mutableStateOf("") }
                             var showContacts by remember { mutableStateOf("") }
+                            var showPerfs by remember { mutableStateOf("") }
                             Column(
                                 modifier = Modifier.padding(
                                     top = 16.dp,
@@ -376,7 +426,8 @@ fun MainScreen() {
                                             SectionCard(
                                                 title = "Веб-ресурс",
                                                 cardcolor = Color(95, 109, 236),
-                                                icon = Icons.Filled.Info,){
+                                                icon = Icons.Filled.Info,
+                                            ){
                                                 showWebView = "https://mospolytech.ru"
                                             }
                                             SectionCard(
@@ -387,7 +438,8 @@ fun MainScreen() {
                                             SectionCard(
                                                 title = "Справочник",
                                                 cardcolor = Color(95, 95, 95),
-                                                icon = Icons.Filled.Info,){ showContacts = "1" }
+                                                icon = Icons.Filled.Info,
+                                            ){ showContacts = "1" }
                                         }
                                         Spacer(modifier = Modifier.size(24.dp))
 
@@ -403,7 +455,11 @@ fun MainScreen() {
                                                 icon = Icons.Filled.Search){
                                                 showWebView = "https://online.mospolytech.ru"
                                             }
-                                            Spacer(modifier = Modifier.size(100.dp))
+                                            SectionCard(
+                                                title = "Успеваемость",
+                                                cardcolor = Color(95, 95, 95),
+                                                icon = Icons.Filled.Info,
+                                            ){ showPerfs = "1" }
                                             Spacer(modifier = Modifier.size(100.dp))
                                         }
                                         Spacer(modifier = Modifier.size(24.dp))
@@ -430,6 +486,9 @@ fun MainScreen() {
                             }
                             if (showContacts != "") {
                                 ContactsScreen(onDismiss = { showContacts = "" })
+                            }
+                            if (showPerfs != "") {
+                                PerfsScreen(defaultPerfs.toList(), onDismiss = { showPerfs = "" })
                             }
                         }
                         composable(settingsTab.title) {
@@ -720,7 +779,6 @@ fun MainScreen() {
     }
 }
 
-
 @Composable
 fun TabView(tabBarItems: List<TabBarItem>, navController: NavController) {
     var selectedTabIndex by rememberSaveable {
@@ -783,15 +841,40 @@ fun WebViewScreen(url: String, onDismiss: () -> Unit) {
 
 @Composable
 fun ContactsScreen(onDismiss: () -> Unit) {
+    val gson = Gson()
+    val context = LocalContext.current
+    val assetManager = context.assets
+    val inputStream = assetManager.open("contacts.json")
+    val contactsString = inputStream.bufferedReader().use { it.readText() }
+    val contactsType = object : TypeToken<List<BiggerContactGroup>>() {}.type
+    val contacts: List<BiggerContactGroup> = gson.fromJson(contactsString, contactsType)
+
+    val selectedGroupState: MutableState<BiggerContactGroup?> = remember { mutableStateOf(null) }
+    val expanded = remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf(TextFieldValue("")) }
+//    val filteredUsers = selectedGroupState.contactgroups.contacts.filter {
+//        it.name.contains(query.text, ignoreCase = true)
+//    }
+    val filteredUsers = selectedGroupState.value?.contactgroups
+        ?.flatMap { it.contacts }
+        ?.filter { it.name.contains(query.text, ignoreCase = true) }
+        ?: emptyList()
+    val filteredContactGroups = selectedGroupState.value?.contactgroups?.filter { group ->
+        group.contacts.any { it in filteredUsers }
+    } ?: emptyList()
+
     Column(
         modifier = Modifier
-            .padding(16.dp, 16.dp, 16.dp, 0.dp)
+            .fillMaxSize()
             .background(Color(0xFF3a3a3a))
+            .padding(16.dp, 16.dp, 16.dp, 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
         ) {
+            HeadingTextComponent("Справочник")
+            Spacer(modifier = Modifier.weight(1f))
             IconButton( // IconButton inherits from Button
                 onClick = { onDismiss() },
                 modifier = Modifier
@@ -799,135 +882,77 @@ fun ContactsScreen(onDismiss: () -> Unit) {
 
             ) {
                 Icon(
-                    imageVector = Icons.Default.Close,
+                    imageVector = Icons.Filled.Close,
                     contentDescription = "Notifications button"
                 )
             }
-            Spacer(modifier = Modifier.size(16.dp))
-            HeadingTextComponent("Справочник")
         }
         Spacer(modifier = Modifier.size(16.dp))
-        LazyColumn(
+        Row(
             modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+        ) {
+            Button(onClick = { expanded.value = !expanded.value }, modifier = Modifier.weight(1f).fillMaxHeight().padding(0.dp, 8.dp, 0.dp, 0.dp)) {
+                Text("Отдел")
+            }
+            DropdownMenu(
+                expanded = expanded.value,
+                onDismissRequest = { expanded.value = false }
+            ) {
+                contacts.forEach { biggerContactGroup ->
+                    DropdownMenuItem(
+                        onClick = {
+                            selectedGroupState.value = biggerContactGroup
+                            expanded.value = false
+                        },
+                        text = { Text(biggerContactGroup.name) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.size(16.dp))
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search") },
+                modifier = Modifier.weight(2f).fillMaxHeight()
+            )
+        }
+
+        selectedGroupState.value?.let { biggerContactGroup ->
+            LazyColumn(modifier = Modifier
+                .padding(top = 16.dp)
                 .fillMaxSize()
                 .absoluteOffset(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            items(1) {
-                HeadingTextComponent("РЕКТОРАТ")
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Миклушевский Владимир Владимирович", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Ректор", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "")
-                        Text(text = "А-203")
-                    }
-                }
-                HorizontalDivider(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .weight(1f),
-                    thickness = 1.dp,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.size(10.dp))
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                items(1) {
+                    HeadingTextComponent(biggerContactGroup.name)
+                    Spacer(modifier = Modifier.size(10.dp))
+                    filteredContactGroups.forEach { contactGroup ->
+                        HeadingTextComponent(contactGroup.name)
+                        contactGroup.contacts.forEach { contact ->
+                            if (contact in filteredUsers) {
+                                Text(text = contact.name, textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
+                                Text(text = contact.title, textAlign = TextAlign.Center)
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(text = contact.number)
+                                    Text(text = contact.cabinet)
+                                }
+                            }
 
-                HeadingTextComponent("АППАРАТ РЕКТОРА")
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Шолохов Олег Викторович", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Руководитель аппарата ректора", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "1102")
-                        Text(text = "А-203")
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .weight(1f),
+                            thickness = 1.dp,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.size(10.dp))
                     }
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Хамраева Жанори", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Помощник ректора по организационным вопросам", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "1101")
-                        Text(text = "А-203")
-                    }
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Бондаренко Дарья Владимировна", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Помощник ректора по документации", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "1202")
-                        Text(text = "А-203")
-                    }
-                }
-                HorizontalDivider(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .weight(1f),
-                    thickness = 1.dp,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.size(10.dp))
-
-                HeadingTextComponent("ОТДЕЛ КОНТРОЛЯ ИСПОЛНЕНИЙ ПОРУЧЕНИЙ РЕКТОРА")
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Царев Василий Иванович", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Помощник ректора", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween){
-                        Text(text = "1132")
-                        Text(text = "А-102")
-                    }
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Демин Тимофей Витальевич", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Документовед", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "1144")
-                        Text(text = "А-102")
-                    }
-                }
-                HorizontalDivider(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .weight(1f),
-                    thickness = 1.dp,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.size(10.dp))
-
-                HeadingTextComponent("ПЕРВЫЙ ПРОРЕКТОР")
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    Text(text = "Абв Где Жзи", textAlign = TextAlign.Center, textDecoration = TextDecoration.Underline)
-                    Text(text = "Первый проректор", textAlign = TextAlign.Center)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(text = "1234")
-                        Text(text = "Й-123")
-                    }
+//                    biggerContactGroup.contactgroups.forEach { contactGroup ->
+//
+//                    }
                 }
             }
         }
@@ -1087,6 +1112,9 @@ fun ClassScheduleDateCards(schedule: Schedule) {
             }
             selectedDayLessons.forEach { lesson ->
                 val dateRange = ScheduleDateToNum(lesson.dateInterval)
+                if (dateRange[3] < dateRange[1]) {
+                    dateRange[3] += 12
+                }
                 if (
                     (currentDate.monthValue in dateRange[1]..dateRange[3] &&
                             (currentDate.monthValue != dateRange[1] && currentDate.monthValue != dateRange[3])) ||
@@ -1224,6 +1252,7 @@ fun TeacherTransform(names: List<String>): List<String> {
 
 @Composable
 fun ClassScheduleItem(lesson: Lesson) {
+    Log.d("PAIR", lesson.toString())
     val background = when (lesson.timeInterval) {
         "9:00 - 10:30" -> Color(0x5ca7ffd3)
         "10:40 - 12:10" -> Color(0x59a3fbfb)
@@ -1310,6 +1339,35 @@ fun ClassScheduleItem(lesson: Lesson) {
             )
         )
     }
+}
+
+fun FormatNews(inputContent: String): String {
+    var inputContentParsed = inputContent.replace("&nbsp;", " ")
+        .replace("<a\\s+.*?>", "")
+        .replace("<img\\s+.*?>", "")
+        .replace("<span\\s+.*?>", "")
+        .replace("</span>", "")
+        .replace("<strong\\s+.*?>", "")
+        .replace("</[a-z]>", "")
+        .replace("<[a-z]>", "")
+        .replace("<strong>", "")
+        .replace("</strong>", "")
+        .replace("</div>", "")
+        .replace("&mdash", "")
+        .replace("&nbsp;", " ")
+        .replace(" &quot;", " ")
+        .replace("&quot; ", " ")
+        .replace("&laquo;", "«")
+        .replace("&raquo;", "»")
+        .replace("&ndash;", "–")
+        .replace("&bull;", "•")
+        .replace("\u003C", "<")
+        .replace("\u003E", ">")
+        .replace("</o:p>", ">")
+        .replace("<o:p>", ">")
+    val doc: Document = Jsoup.parse(inputContentParsed)
+    val text = doc.text() // Extracts the plain text, removing all HTML tags.
+    return inputContentParsed
 }
 
 @Composable
@@ -1601,10 +1659,134 @@ fun AlertPopup(alert: Alert, onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.padding(16.dp))
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(1) {
-                        TextComponent(alert.content
+                        TextComponent(FormatNews(alert.content)
                             .replace("<p>\r\n\t", "\n")
                             .replace("</p>\r\n", "\n")
                             .replace("&nbsp;", ""))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PerfsScreen(perfs: List<AcademicPerformance>, onDismiss: () -> Unit) {
+    val selectedSemestrState: MutableState<AcademicPerformance?> = remember { mutableStateOf(null) }
+    val expanded = remember { mutableStateOf(false) }
+    val background = Color(120, 120, 120)
+    val textcolor = Color.DarkGray
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF3a3a3a))
+            .padding(16.dp, 16.dp, 16.dp, 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            HeadingTextComponent("Успеваемость")
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton( // IconButton inherits from Button
+                onClick = { onDismiss() },
+                modifier = Modifier
+                    .size(30.dp) // Set desired size for the button
+
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Exit button"
+                )
+            }
+        }
+        Spacer(modifier = Modifier.size(16.dp))
+
+        Button(onClick = { expanded.value = !expanded.value }) {
+            Text("Выбрать семестр")
+        }
+        DropdownMenu(
+            expanded = expanded.value,
+            onDismissRequest = { expanded.value = false }
+        ) {
+            perfs.forEach { perf ->
+                DropdownMenuItem(
+                    onClick = {
+                        selectedSemestrState.value = perf
+                        expanded.value = false
+                    },
+                    text = { Text(perf.academicPerformance[0].semestr) }
+                )
+            }
+        }
+
+        selectedSemestrState.value?.let { perf ->
+            LazyColumn(modifier = Modifier
+                .padding(top = 16.dp)
+                .fillMaxSize()
+                .absoluteOffset(),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                items(1) {
+                    HeadingTextComponent("Семестр " + perf.academicPerformance[0].semestr)
+                    Spacer(modifier = Modifier.size(10.dp))
+
+                    perf.academicPerformance.forEach { bill ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(80.dp)
+                                .clip(RoundedCornerShape(15.dp))
+                                .background(background)
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = bill.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = TextStyle(
+                                    color = textcolor,
+                                    fontSize = 12.sp, // 0.8em ≈ 12.8 sp
+                                    lineHeight = 16.sp, // 1.3 * 12.8 ≈ 16.64 sp
+                                    fontWeight = FontWeight.Normal,
+                                    fontFamily = montserrat
+                                )
+                            )
+                            Text(
+                                text = bill.teacher,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = TextStyle(
+                                    color = textcolor,
+                                    fontSize = 12.sp, // 0.8em ≈ 12.8 sp
+                                    lineHeight = 16.sp, // 1.3 * 12.8 ≈ 16.64 sp
+                                    fontWeight = FontWeight.Normal,
+                                    fontFamily = montserrat
+                                )
+                            )
+                            Text(
+                                text = bill.exam_date + " " + bill.exam_time,
+                                style = TextStyle(
+                                    color = textcolor,
+                                    fontSize = 12.sp, // 0.8em ≈ 12.8 sp
+                                    lineHeight = 16.sp, // 1.3 * 12.8 ≈ 16.64 sp
+                                    fontWeight = FontWeight.Normal,
+                                    fontFamily = montserrat
+                                )
+                            )
+                            Text(
+                                text = bill.grade,
+                                style = TextStyle(
+                                    color = textcolor,
+                                    fontSize = 12.sp, // 0.8em ≈ 12.8 sp
+                                    lineHeight = 16.sp, // 1.3 * 12.8 ≈ 16.64 sp
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = montserrat
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.size(10.dp))
                     }
                 }
             }

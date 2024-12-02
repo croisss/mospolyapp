@@ -50,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation("org.jsoup:jsoup:1.18.1")
     implementation("androidx.compose.runtime:runtime-livedata:1.6.7")
     implementation("androidx.fragment:fragment-ktx:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
